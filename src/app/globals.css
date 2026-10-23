@@ -39,7 +39,7 @@
   display: block;
   width: var(--fd-chaty-size, 54px);
   height: var(--fd-chaty-size, 54px);
-  margin: 4px; /* chaty: .chaty-channel */
+  margin: 4px 4px 0; /* chaty .chaty-channel-list: 4px gutter, button sits on the bottom edge */
   border-radius: 50%;
   box-shadow: 0 16px 24px 0 rgba(73, 104, 126, 0.16);
   animation: fd-chaty-waggle 5s infinite;
