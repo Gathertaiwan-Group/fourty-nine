@@ -3,6 +3,13 @@
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities);
 
+/* Tailwind v4 defines a global --spacing (0.25rem), which hijacks Blocksy's
+   `.ct-pagination { margin-top: var(--spacing, 60px) }` fallback (4px instead of 60px).
+   Restore Blocksy's entries-to-pagination gap on search and archive pages. */
+.ct-pagination {
+  --spacing: 60px;
+}
+
 .fd-contents {
   display: contents;
 }
