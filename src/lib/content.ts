@@ -185,31 +185,32 @@ export async function getPostsByTerm(termId: number, page: number): Promise<{ ca
   if (error) throw error;
   const ids = (links ?? []).map((l) => l.post_id);
   if (!ids.length) return { cards: [], total: 0 };
+  return pagedCards((q) => q.in('id', ids), page);
+}
+
+/**
+ * One archive page of published posts. PostgREST answers an offset past the end with
+ * PGRST103 (HTTP 416); that is "page out of range", not a server error, so we report the
+ * real total with an empty page and let the route answer 404 like WordPress does.
+ */
+async function pagedCards(filter: (q: any) => any, page: number): Promise<{ cards: Card[]; total: number }> {
   const from = (page - 1) * PER_PAGE;
-  const { data, count, error: e2 } = await db()
-    .from('posts')
-    .select(CARD_COLS, { count: 'exact' })
-    .in('id', ids)
-    .eq('status', 'publish')
-    .eq('post_type', 'post')
+  const base = (sel: string, opts: Record<string, unknown>) =>
+    filter(db().from('posts').select(sel, opts).eq('status', 'publish').eq('post_type', 'post'));
+  const { data, count, error } = await base(CARD_COLS, { count: 'exact' })
     .order('date', { ascending: false })
     .range(from, from + PER_PAGE - 1);
-  if (e2) throw e2;
+  if (error) {
+    if (error.code !== 'PGRST103') throw error;
+    const { count: c, error: e2 } = await base('id', { count: 'exact', head: true });
+    if (e2) throw e2;
+    return { cards: [], total: c ?? 0 };
+  }
   return { cards: await hydrate(data ?? []), total: count ?? 0 };
 }
 
 export async function getPostsByAuthor(authorId: number, page: number): Promise<{ cards: Card[]; total: number }> {
-  const from = (page - 1) * PER_PAGE;
-  const { data, count, error } = await db()
-    .from('posts')
-    .select(CARD_COLS, { count: 'exact' })
-    .eq('author_id', authorId)
-    .eq('status', 'publish')
-    .eq('post_type', 'post')
-    .order('date', { ascending: false })
-    .range(from, from + PER_PAGE - 1);
-  if (error) throw error;
-  return { cards: await hydrate(data ?? []), total: count ?? 0 };
+  return pagedCards((q) => q.eq('author_id', authorId), page);
 }
 
 /** Blocksy "related posts": same category, newest first, max 6, current post excluded. */

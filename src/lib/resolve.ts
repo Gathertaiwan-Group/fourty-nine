@@ -63,7 +63,7 @@ export const resolvePath = cache(async (rawSegs: string[]): Promise<Resolved> =>
     const q = base[1];
     const { cards, total } = await search(q, page);
     const pages = Math.max(1, Math.ceil(total / PER_PAGE));
-    if (page > pages) return { kind: 'notfound' };
+    if (page > pages || (page > 1 && !cards.length)) return { kind: 'notfound' };
     return { kind: 'search', q, page, pages, total, cards };
   }
 
@@ -73,7 +73,7 @@ export const resolvePath = cache(async (rawSegs: string[]): Promise<Resolved> =>
     if (term) {
       const { cards, total } = await getPostsByTerm(term.id, page);
       const pages = Math.max(1, Math.ceil(total / PER_PAGE));
-      if (page > pages) return { kind: 'notfound' };
+      if (page > pages || (page > 1 && !cards.length)) return { kind: 'notfound' };
       return { kind: 'term', term, page, pages, cards };
     }
   }
@@ -83,7 +83,7 @@ export const resolvePath = cache(async (rawSegs: string[]): Promise<Resolved> =>
     if (author) {
       const { cards, total } = await getPostsByAuthor(author.id, page);
       const pages = Math.max(1, Math.ceil(total / PER_PAGE));
-      if (page > pages) return { kind: 'notfound' };
+      if (page > pages || (page > 1 && !cards.length)) return { kind: 'notfound' };
       return { kind: 'author', author, page, pages, cards };
     }
   }

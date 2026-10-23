@@ -27,13 +27,13 @@ async function run<T>(fn: (actor: ReturnType<typeof actorOf>) => Promise<T>, mes
 
 export type EditorFields = posts.PostInput & { id?: number; post_type: string };
 
-export async function savePost(fields: EditorFields): Promise<Result<{ id: number; status: string; path: string }>> {
+export async function savePost(fields: EditorFields): Promise<Result<{ id: number; status: string; path: string; slug: string }>> {
   return run(async (actor) => {
     const { id, post_type, ...input } = fields;
     const p = id ? await posts.updatePost(id, input, actor) : await posts.createPost(post_type, input, actor);
     await clearPreview(p.id);
     revalidatePath('/admin/posts/');
-    return { id: p.id, status: p.status, path: p.path };
+    return { id: p.id, status: p.status, path: p.path, slug: p.slug };
   });
 }
 

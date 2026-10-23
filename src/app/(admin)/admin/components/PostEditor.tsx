@@ -101,7 +101,7 @@ export function PostEditor({
     if (!r.ok) return setMsg({ ok: false, text: r.error });
     setDirty(false);
     setDateTouched(false);
-    setP((prev) => ({ ...prev, id: r.data.id, status: r.data.status, path: r.data.path }));
+    setP((prev) => ({ ...prev, id: r.data.id, status: r.data.status, path: r.data.path, slug: r.data.slug }));
     setMsg({ ok: true, text: r.data.status === 'future' ? `已排程，將於 ${dateLocal.replace('T', ' ')} 發布。` : okText });
     if (!p.id) router.replace(`/admin/posts/${r.data.id}/`);
     else router.refresh();

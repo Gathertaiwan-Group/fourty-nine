@@ -40,6 +40,20 @@ function initSticky(root: ParentNode) {
   if (!header) return;
   header.classList.add('fd-sticky-header');
   section.classList.add('elementor-sticky', 'elementor-sticky--active', 'elementor-section--handles-inside');
+  // Elementor Pro's sticky sets `margin-top:0; margin-bottom:0` inline on the fixed element and leaves the
+  // section's own margins (here -11px) on the in-flow spacer. Do the same: the bar sits flush at the top and
+  // the content below keeps the original offset via the header's bottom margin.
+  const syncMargins = () => {
+    section.style.marginTop = '';
+    section.style.marginBottom = '';
+    const cs = getComputedStyle(section);
+    const offset = (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+    section.style.marginTop = '0px';
+    section.style.marginBottom = '0px';
+    header.style.marginBottom = offset ? `${offset}px` : '';
+  };
+  syncMargins();
+  window.addEventListener('resize', syncMargins, { passive: true });
   const onScroll = () => section.classList.toggle('elementor-sticky--effects', window.scrollY > 0);
   onScroll();
   window.addEventListener('scroll', onScroll, { passive: true });

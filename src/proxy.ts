@@ -37,6 +37,14 @@ async function refreshAdminSession(req: NextRequest) {
 
 export async function proxy(req: NextRequest) {
   const url = req.nextUrl;
+  // trailingSlash redirect lives here (next.config skipTrailingSlashRedirect) so that /api/* — excluded by
+  // the matcher — answers on both /api/mcp and /api/mcp/: MCP clients POST without following a 308.
+  const last = url.pathname.slice(url.pathname.lastIndexOf('/') + 1);
+  if (!url.pathname.endsWith('/') && !last.includes('.')) {
+    const to = new URL(req.url); // plain URL: NextURL would re-normalise the slash away
+    to.pathname = url.pathname + '/';
+    return NextResponse.redirect(to.toString(), 308);
+  }
   if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) return refreshAdminSession(req);
   const path = decode(url.pathname);
 

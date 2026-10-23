@@ -264,11 +264,18 @@ export async function updatePost(id: number, input: PostInput, actor: Actor) {
   if (seo !== undefined) patch.seo = seo;
 
   // slug / parent change => new path; keep the old public URL working with a 301 like WP's _wp_old_slug
-  const slugChanged = input.slug !== undefined && slugify(input.slug) !== before.slug;
+  // An empty slug field means "automatic" (same as MCP create_post): keep the current slug, except a
+  // placeholder slug ("untitled", from a draft saved before it had a title) which WordPress would still
+  // derive from the title as long as the post has never been published.
+  const slugIn = input.slug?.trim();
+  const titleNow = (input.title ?? before.title ?? '').trim();
+  const placeholder = /^untitled(-\d+)?$/.test(before.slug) && before.status !== 'publish';
+  const wantSlug = slugIn ? slugify(slugIn) : placeholder && titleNow ? slugify(titleNow) : undefined;
+  const slugChanged = wantSlug !== undefined && wantSlug !== 'untitled' && wantSlug !== before.slug;
   const parentChanged = type === 'page' && input.parent_id !== undefined && input.parent_id !== before.parent_id;
   if (parentChanged && input.parent_id === id) throw new CmsError('上層頁面不可為自己');
   if (slugChanged || parentChanged) {
-    const slug = slugChanged ? await uniqueSlug(type, slugify(input.slug!), id) : before.slug;
+    const slug = slugChanged ? await uniqueSlug(type, wantSlug!, id) : before.slug;
     patch.slug = slug;
     patch.wp_slug = wpSlug(slug);
     if (parentChanged) patch.parent_id = input.parent_id;
