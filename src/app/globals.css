@@ -1,0 +1,163 @@
+/* Tailwind without preflight: the WordPress theme CSS (Blocksy + Elementor) owns the base styles. */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+.fd-contents {
+  display: contents;
+}
+
+/* Elementor Pro sticky header (position fixed + spacer on the old site) */
+.fd-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 99;
+}
+
+/* SmartMenus dropdown behaviour for the desktop nav */
+.elementor-nav-menu--main .elementor-nav-menu li:hover > ul.sub-menu,
+.elementor-nav-menu--main .elementor-nav-menu li:focus-within > ul.sub-menu {
+  display: block;
+  top: auto;
+  left: 0;
+  margin-left: 0;
+  margin-top: 0;
+  width: auto;
+  min-width: 12em;
+}
+
+/* Chaty floating contact button */
+.fd-chaty {
+  position: fixed;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fd-chaty-channel {
+  position: relative;
+  display: block;
+  width: var(--fd-chaty-size, 54px);
+  height: var(--fd-chaty-size, 54px);
+  border-radius: 50%;
+  box-shadow: 0 0 14px rgba(0, 0, 0, 0.15);
+  animation: fd-chaty-waggle 5s infinite;
+}
+.fd-chaty-icon,
+.fd-chaty-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.fd-chaty-channel::after {
+  content: attr(data-hover);
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 12px);
+  transform: translateY(-50%);
+  background: #fff;
+  color: #333;
+  font: 14px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding: 6px 10px;
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.fd-chaty[data-position='left'] .fd-chaty-channel::after {
+  right: auto;
+  left: calc(100% + 12px);
+}
+.fd-chaty-channel:hover::after,
+.fd-chaty-channel:focus-visible::after {
+  opacity: 1;
+}
+@keyframes fd-chaty-waggle {
+  0%,
+  92%,
+  100% {
+    transform: rotate(0);
+  }
+  94% {
+    transform: rotate(-12deg);
+  }
+  96% {
+    transform: rotate(12deg);
+  }
+  98% {
+    transform: rotate(-6deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fd-chaty-channel {
+    animation: none;
+  }
+}
+
+/* Elementor lightbox replacement */
+.fd-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.87);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+.fd-lightbox figure {
+  margin: 0;
+  max-width: 90vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.fd-lightbox img {
+  max-width: 90vw;
+  max-height: 80vh;
+  object-fit: contain;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+}
+.fd-lightbox figcaption {
+  color: #fff;
+  margin-top: 12px;
+  font-size: 14px;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+.fd-lightbox button {
+  position: absolute;
+  background: none;
+  border: 0;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  font-size: 48px;
+  line-height: 1;
+  padding: 12px 18px;
+}
+.fd-lightbox button:hover {
+  color: #fff;
+}
+.fd-lightbox-close {
+  top: 8px;
+  right: 8px;
+  font-size: 40px !important;
+}
+.fd-lightbox-prev {
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.fd-lightbox-next {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.fd-lightbox--single .fd-lightbox-prev,
+.fd-lightbox--single .fd-lightbox-next {
+  display: none;
+}

@@ -1,0 +1,65 @@
+@import 'tailwindcss';
+
+:root {
+  --wp-blue: #2271b1;
+  --wp-dark: #1d2327;
+}
+body {
+  background: #f0f0f1;
+  color: #1d2327;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+  font-size: 14px;
+}
+.btn {
+  @apply inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50;
+  border-color: var(--wp-blue);
+  color: var(--wp-blue);
+  background: #f6f7f7;
+}
+.btn:hover {
+  background: #f0f0f1;
+}
+.btn-primary {
+  background: var(--wp-blue);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: #135e96;
+}
+.btn-danger {
+  border-color: #d63638;
+  color: #d63638;
+  background: #fff;
+}
+.input {
+  @apply w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-[#2271b1] focus:outline-none focus:ring-1 focus:ring-[#2271b1];
+}
+.label {
+  @apply mb-1 block text-xs font-semibold text-gray-600;
+}
+.card {
+  @apply rounded border border-gray-200 bg-white p-4 shadow-sm;
+}
+.table {
+  @apply w-full border-collapse bg-white text-sm;
+}
+.table th {
+  @apply border-b border-gray-200 px-3 py-2 text-left font-semibold;
+}
+.table td {
+  @apply border-b border-gray-100 px-3 py-2 align-top;
+}
+.table tr:hover td {
+  background: #f6f7f7;
+}
+.badge {
+  @apply inline-block rounded px-1.5 py-0.5 text-xs;
+  background: #f0f0f1;
+}
+.notice {
+  @apply mb-4 rounded border-l-4 bg-white px-3 py-2 shadow-sm;
+  border-color: #00a32a;
+}
+.notice-error {
+  border-color: #d63638;
+}

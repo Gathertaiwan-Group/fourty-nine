@@ -1,0 +1,10 @@
+.env*
+node_modules/
+.next/
+.vercel/
+export/
+work/
+next-env.d.ts
+*.tsbuildinfo
+src/generated/
+.vercel
