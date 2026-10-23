@@ -4,7 +4,7 @@ import postHead from '@/theme/head-post.json';
 import { Shell } from '@/components/Shell';
 import { Archive, ElementorPage, Pagination, SinglePost } from '@/components/Blocksy';
 import type { HeadEntry } from '@/lib/content';
-import { getAuthors } from '@/lib/content';
+import { getAuthors, POST_LIST_WIDGETS, stripDynamicWidgets } from '@/lib/content';
 import { resolvePath, type Resolved } from '@/lib/resolve';
 import { absolutizeSchema, seoMetadata, SITE_NAME } from '@/lib/seo';
 
@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     case 'search':
       return {
         ...seoMetadata(null, { path, fallbackTitle: `您正在找 ${r.q}`, noindex: true }),
-        title: { absolute: `您正在找 ${r.q} | ${SITE_NAME}` },
+        title: { absolute: r.page > 1 ? `您正在找 ${r.q} | 第 ${r.page} 頁，總計 ${r.pages} 頁 | ${SITE_NAME}` : `您正在找 ${r.q} | ${SITE_NAME}` },
       };
     default:
       return { title: { absolute: `找不到頁面 | ${SITE_NAME}` }, robots: { index: false, follow: true } };
@@ -66,11 +66,13 @@ export default async function WpRoute({ params }: Props) {
   if (r.kind === 'notfound') notFound();
 
   if (r.kind === 'page') {
-    const p = r.post;
+    const n = r.paged;
+    const p = n ? { ...r.post, content_html: stripDynamicWidgets(r.post.content_html, POST_LIST_WIDGETS) } : r.post;
     const isFront = p.path === '/';
-    const bodyClass =
+    let bodyClass =
       p.meta?.body_class ||
       `${isFront ? 'home ' : ''}wp-singular page-template page-template-elementor_header_footer page page-id-${p.id} elementor-template-full-width elementor-page elementor-page-${p.id}`;
+    if (n) bodyClass = bodyClass.replace('wp-singular', 'paged wp-singular').replace('wp-embed-responsive', `wp-embed-responsive paged-${n} page-paged-${n}`);
     return (
       <Shell path={p.path} bodyClass={bodyClass} prefix="single_page" head={p.meta?.head} itemType="https://schema.org/WebPage">
         <JsonLd data={p.seo?.schema} />

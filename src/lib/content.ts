@@ -237,29 +237,91 @@ function escapeLike(s: string) {
   return s.replace(/[\\%_,()]/g, (c) => '\\' + c);
 }
 
-/** WordPress-like search: every word must appear in title, excerpt or content. Title hits rank first. */
+const DYNAMIC_WIDGETS = /^(posts|portfolio|loop-grid|loop-carousel|archive-posts|nav-menu)\./;
+/** Elementor's dynamic widgets (post lists, menus) are rendered at request time and are not part of post_content. */
+export const POST_LIST_WIDGETS = /^(posts|portfolio|loop-grid|loop-carousel|archive-posts)\./;
+export function stripDynamicWidgets(h: string, which: RegExp = DYNAMIC_WIDGETS): string {
+  const open = /<div\b[^>]*data-widget_type="([^"]+)"[^>]*>/g;
+  for (let m = open.exec(h); m; m = open.exec(h)) {
+    if (!which.test(m[1])) continue;
+    const tag = /<(\/?)div\b[^>]*>/g;
+    tag.lastIndex = m.index + m[0].length;
+    let depth = 1;
+    let end = h.length;
+    for (let t = tag.exec(h); t; t = tag.exec(h)) {
+      depth += t[1] ? -1 : 1;
+      if (depth === 0) {
+        end = t.index + t[0].length;
+        break;
+      }
+    }
+    h = h.slice(0, m.index) + h.slice(end);
+    open.lastIndex = m.index;
+  }
+  return h;
+}
+
+/** WP_Query::parse_search_terms(): split on spaces / quotes, drop stopword-like single letters, >9 terms = sentence. */
+function searchTerms(q: string): string[] {
+  const s = q.replace(/\s+/g, ' ').trim();
+  const raw = s.match(/".*?("|$)|((?<=[\t ",+])|^)[^\t ",+]+/g) || [];
+  const terms = raw
+    .map((t) => t.replace(/^["' ]+|["' ]+$/g, ''))
+    .filter((t) => t && !(t.length === 1 && /^[a-z-]$/i.test(t)));
+  return !terms.length || terms.length > 9 ? [s] : terms;
+}
+
+/**
+ * WordPress-native search (WP_Query::parse_search + parse_search_order): every term must appear (LIKE, case-insensitive)
+ * in the raw post_title, post_excerpt or post_content; a leading "-" excludes. Ordering: one term -> title hits
+ * first, then post_date DESC; several terms -> WP's CASE ranking, then post_date DESC.
+ */
 export async function search(q: string, page: number): Promise<{ cards: Card[]; total: number }> {
-  const words = q.trim().split(/\s+/).filter(Boolean).slice(0, 8);
-  if (!words.length) return { cards: [], total: 0 };
+  const terms = searchTerms(q);
+  if (!terms.length || !q.trim()) return { cards: [], total: 0 };
+  const inc = terms.filter((t) => !(t.startsWith('-') && t.length > 1));
+  const exc = terms.filter((t) => t.startsWith('-') && t.length > 1).map((t) => t.slice(1));
   let query = db()
     .from('posts')
-    .select(CARD_COLS + ',content_html')
+    .select(CARD_COLS + ',content_raw,excerpt_raw,content_html')
     .eq('status', 'publish')
     .in('post_type', ['post', 'page']);
-  for (const w of words) {
+  for (const w of inc) {
     const p = `%${escapeLike(w)}%`;
-    query = query.or(`title.ilike.${p},excerpt_html.ilike.${p},content_html.ilike.${p}`);
+    query = query.or(`title.ilike.${p},excerpt_raw.ilike.${p},content_raw.ilike.${p},content_html.ilike.${p}`);
   }
-  const { data, error } = await query.order('date', { ascending: false }).limit(500);
+  const { data, error } = await query.order('date', { ascending: false }).limit(1000);
   if (error) throw error;
-  const strip = (h: string) => h.replace(/<[^>]+>/g, ' ');
-  const rows = (data ?? []).filter((r: any) =>
-    words.every((w) => [r.title, strip(r.excerpt_html || ''), strip(r.content_html || '')].some((f) => f.toLowerCase().includes(w.toLowerCase()))),
-  );
-  const titleHit = (r: any) => words.every((w) => r.title.toLowerCase().includes(w.toLowerCase()));
-  rows.sort((a: any, b: any) => Number(titleHit(b)) - Number(titleHit(a)) || (b.date || '').localeCompare(a.date || ''));
-  const total = rows.length;
-  const slice = rows.slice((page - 1) * PER_PAGE, page * PER_PAGE).map(({ content_html, ...r }: any) => r);
+  const lc = (x: string | null | undefined) => (x || '').toLowerCase();
+  const rows = (data ?? []).map((r: any) => ({
+    r,
+    t: lc(r.title),
+    e: lc(r.excerpt_raw),
+    c: lc(stripDynamicWidgets(r.content_raw ?? r.content_html ?? '')),
+  }));
+  const has = (x: { t: string; e: string; c: string }, w: string) => {
+    const k = w.toLowerCase();
+    return x.t.includes(k) || x.e.includes(k) || x.c.includes(k);
+  };
+  const hits = rows.filter((x) => inc.every((w) => has(x, w)) && !exc.some((w) => has(x, w)));
+  const sentence = /(?:\s|^)-/.test(q) ? '' : q.toLowerCase();
+  const rank = (x: { t: string; e: string; c: string }) => {
+    if (terms.length <= 1) return x.t.includes(lc(inc[0] ?? q)) ? 0 : 1;
+    if (sentence && x.t.includes(sentence)) return 1;
+    const tw = inc.map((w) => x.t.includes(w.toLowerCase()));
+    if (inc.length < 7) {
+      if (tw.every(Boolean)) return 2;
+      if (tw.some(Boolean)) return 3;
+    }
+    if (sentence && x.e.includes(sentence)) return 4;
+    if (sentence && x.c.includes(sentence)) return 5;
+    return 6;
+  };
+  hits.sort((a, b) => rank(a) - rank(b) || (b.r.date || '').localeCompare(a.r.date || ''));
+  const total = hits.length;
+  const slice = hits
+    .slice((page - 1) * PER_PAGE, page * PER_PAGE)
+    .map(({ r: { content_raw, excerpt_raw, content_html, ...r } }: any) => r);
   return { cards: await hydrate(slice), total };
 }
 

@@ -20,7 +20,7 @@ import {
 } from './content';
 
 export type Resolved =
-  | { kind: 'page'; post: Post }
+  | { kind: 'page'; post: Post; paged?: number }
   | { kind: 'single'; post: Post; related: Card[]; catIds: number[] }
   | { kind: 'term'; term: Term; page: number; pages: number; cards: Card[] }
   | { kind: 'author'; author: Author; page: number; pages: number; cards: Card[] }
@@ -52,10 +52,12 @@ export const resolvePath = cache(async (rawSegs: string[]): Promise<Resolved> =>
   const { base, page } = sp;
 
   // front page
-  if (base.length === 0 && page === 1) {
+  // (WP answers /page/N/ on a static front page with the page itself; its post-list widgets come out empty)
+  if (base.length === 0) {
     const s = await getSettings();
     const post = s.page_on_front ? await getPostById(Number(s.page_on_front)) : await getPostByPath('/');
-    return post ? { kind: 'page', post } : { kind: 'notfound' };
+    if (!post) return { kind: 'notfound' };
+    return page === 1 ? { kind: 'page', post } : { kind: 'page', post, paged: page };
   }
 
   // search: /?s=q is rewritten to /search/q/ by the proxy (same as WP's own /search/q/ rewrite)
@@ -98,6 +100,13 @@ export const resolvePath = cache(async (rawSegs: string[]): Promise<Resolved> =>
     }
     const r = await getRedirect(path);
     if (r) return { kind: 'redirect', to: r.target, status: r.status_code };
+  }
+  // WP's lenient paging on singular URLs: /some-page/page/N/ -> the page (200, list widgets empty),
+  // /some-post/page/N/ -> 301 to the post (redirect_canonical)
+  if (page > 1 && base.length && base[0] !== 'search') {
+    const post = await getPostByPath('/' + base.join('/') + '/');
+    if (post?.post_type === 'page') return { kind: 'page', post, paged: page };
+    if (post) return { kind: 'redirect', to: post.path, status: 301 };
   }
   return { kind: 'notfound' };
 });

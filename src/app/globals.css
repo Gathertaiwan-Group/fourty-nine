@@ -39,8 +39,9 @@
   display: block;
   width: var(--fd-chaty-size, 54px);
   height: var(--fd-chaty-size, 54px);
+  margin: 4px; /* chaty: .chaty-channel */
   border-radius: 50%;
-  box-shadow: 0 0 14px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 16px 24px 0 rgba(73, 104, 126, 0.16);
   animation: fd-chaty-waggle 5s infinite;
 }
 .fd-chaty-icon,
