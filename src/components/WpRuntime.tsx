@@ -70,6 +70,16 @@ function initNavMenus(root: ParentNode) {
       dropdown.style.width = `${w}px`;
       dropdown.style.left = `${-left}px`;
     };
+    // Elementor Pro positions the toggle dropdown right under the toggle button (top = toggle outerHeight)
+    // and exposes the viewport height below the dropdown as --menu-height; without it the absolutely-positioned
+    // dropdown sits at top:0 and covers the logo and the close (X) button.
+    const place = () => {
+      if (!dropdown || !toggle) return;
+      const h = toggle.offsetHeight;
+      if (!h) return; // toggle hidden (desktop breakpoint)
+      dropdown.style.top = `${h}px`;
+      dropdown.style.setProperty('--menu-height', `${window.innerHeight - dropdown.getBoundingClientRect().top}px`);
+    };
     const close = () => {
       toggle?.classList.remove('elementor-active');
       toggle?.setAttribute('aria-expanded', 'false');
@@ -81,6 +91,7 @@ function initNavMenus(root: ParentNode) {
       toggle.setAttribute('aria-expanded', String(open));
       dropdown?.setAttribute('aria-hidden', String(!open));
       dropdown?.querySelectorAll('a').forEach((a) => (open ? a.removeAttribute('tabindex') : a.setAttribute('tabindex', '-1')));
+      place();
       stretch();
     });
     toggle?.addEventListener('keydown', (e) => {
@@ -90,9 +101,11 @@ function initNavMenus(root: ParentNode) {
       }
     });
     window.addEventListener('resize', () => {
+      place();
       stretch();
       if (window.innerWidth > BP_TABLET) close();
     });
+    place();
     stretch();
     // collapsible sub-menus inside the mobile dropdown (SmartMenus "collapsible" behaviour)
     dropdown?.querySelectorAll<HTMLAnchorElement>('a.has-submenu').forEach((a) => {

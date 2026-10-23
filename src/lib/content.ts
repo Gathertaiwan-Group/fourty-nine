@@ -271,6 +271,73 @@ function searchTerms(q: string): string[] {
   return !terms.length || terms.length > 9 ? [s] : terms;
 }
 
+/** mb_strwidth(): East Asian wide / fullwidth code points count 2, everything else 1. */
+function charWidth(cp: number) {
+  return (cp >= 0x1100 && cp <= 0x115f) ||
+    (cp >= 0x2329 && cp <= 0x232a) ||
+    (cp >= 0x2e80 && cp <= 0x303e) ||
+    (cp >= 0x3041 && cp <= 0x33ff) ||
+    (cp >= 0x3400 && cp <= 0x4dbf) ||
+    (cp >= 0x4e00 && cp <= 0x9fff) ||
+    (cp >= 0xa000 && cp <= 0xa4cf) ||
+    (cp >= 0xa960 && cp <= 0xa97f) ||
+    (cp >= 0xac00 && cp <= 0xd7a3) ||
+    (cp >= 0xf900 && cp <= 0xfaff) ||
+    (cp >= 0xfe10 && cp <= 0xfe19) ||
+    (cp >= 0xfe30 && cp <= 0xfe6f) ||
+    (cp >= 0xff00 && cp <= 0xff60) ||
+    (cp >= 0xffe0 && cp <= 0xffe6) ||
+    (cp >= 0x1f200 && cp <= 0x1f251) ||
+    (cp >= 0x20000 && cp <= 0x3fffd)
+    ? 2
+    : 1;
+}
+
+const decodeEntities = (s: string) =>
+  s
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+
+/**
+ * Generated excerpt for posts/pages without a manual one (wp_trim_excerpt on the rendered content, then Blocksy's
+ * card trim). The old site's cards cut the stripped text to display width 40 with a "…" marker
+ * (mb_strimwidth(text, 0, 40, '…')): e.g. 77:Blog -> 「柒柒Re:branding 關於我的執案紀錄，與行…」.
+ */
+export function autoExcerpt(html: string, width = 40): string {
+  const text = decodeEntities(
+    html
+      .replace(/<(script|style|template)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/\[\/?[a-z_-]+[^\]]*\]/gi, '') // strip_shortcodes
+      .replace(/<[^>]+>/g, ''),
+  )
+    .replace(/[\n\r\t ]+/g, ' ')
+    .trim();
+  if (!text) return '';
+  const chars = Array.from(text);
+  const total = chars.reduce((n, c) => n + charWidth(c.codePointAt(0)!), 0);
+  let out = text;
+  if (total > width) {
+    const limit = width - 1; // width of the "…" trim marker
+    let w = 0;
+    let i = 0;
+    for (; i < chars.length; i++) {
+      const cw = charWidth(chars[i].codePointAt(0)!);
+      if (w + cw > limit) break;
+      w += cw;
+    }
+    out = chars.slice(0, i).join('') + '…';
+  }
+  const esc = out.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<p>${esc}</p>`;
+}
+
 /**
  * WordPress-native search (WP_Query::parse_search + parse_search_order): every term must appear (LIKE, case-insensitive)
  * in the raw post_title, post_excerpt or post_content; a leading "-" excludes. Ordering: one term -> title hits
@@ -321,7 +388,9 @@ export async function search(q: string, page: number): Promise<{ cards: Card[]; 
   const total = hits.length;
   const slice = hits
     .slice((page - 1) * PER_PAGE, page * PER_PAGE)
-    .map(({ r: { content_raw, excerpt_raw, content_html, ...r } }: any) => r);
+    .map(({ r: { content_raw, excerpt_raw, content_html, ...r } }: any) =>
+      (r.excerpt_html || '').trim() ? r : { ...r, excerpt_html: autoExcerpt(content_html || content_raw || '') },
+    );
   return { cards: await hydrate(slice), total };
 }
 

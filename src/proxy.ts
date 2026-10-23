@@ -48,6 +48,15 @@ export async function proxy(req: NextRequest) {
   if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) return refreshAdminSession(req);
   const path = decode(url.pathname);
 
+  // WordPress per-object feeds: /comments/feed/, /category/<slug>/feed/, /tag/<slug>/feed/, /<post>/feed/
+  const feed = url.pathname.match(/^\/(.+)\/feed\/$/);
+  if (feed && !url.pathname.startsWith('/wp-feed/')) {
+    const to = url.clone();
+    to.pathname = `/wp-feed/${feed[1]}/`;
+    to.search = '';
+    return NextResponse.rewrite(to);
+  }
+
   // WordPress search: /?s=q and /page/N/?s=q  ->  internal /search/q/ (WP's own pretty search URL)
   const s = url.searchParams.get('s');
   if (s && s.trim()) {
