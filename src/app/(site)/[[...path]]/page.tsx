@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
-import { notFound, permanentRedirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 import postHead from '@/theme/head-post.json';
 import { Shell } from '@/components/Shell';
+import { InlineNotFound } from '@/components/NotFoundPage';
 import { Archive, ElementorPage, Pagination, SinglePost } from '@/components/Blocksy';
 import type { HeadEntry } from '@/lib/content';
 import { getAuthors, POST_LIST_WIDGETS, stripDynamicWidgets } from '@/lib/content';
@@ -63,7 +64,7 @@ export default async function WpRoute({ params }: Props) {
   const path = pathOf(r, segs);
 
   if (r.kind === 'redirect') permanentRedirect(r.to);
-  if (r.kind === 'notfound') notFound();
+  if (r.kind === 'notfound') return <InlineNotFound />;
 
   if (r.kind === 'page') {
     const n = r.paged;
