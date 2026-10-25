@@ -176,6 +176,35 @@ function initLazyBackgrounds(root: ParentNode) {
   els.forEach((el) => io.observe(el));
 }
 
+/** Smallest candidate of a "url 480w, url 960w" list that covers the element's width × DPR. */
+function pickFromSrcset(srcset: string | undefined, el: HTMLElement): string | null {
+  const set = (srcset || '')
+    .split(',')
+    .map((s) => s.trim().split(/\s+/))
+    .map(([u, w]) => ({ u, w: parseInt(w, 10) }))
+    .filter((v) => v.u && v.w)
+    .sort((a, b) => a.w - b.w);
+  if (!set.length) return null;
+  const need = Math.max(el.clientWidth, el.parentElement?.clientWidth || 0, 1) * (window.devicePixelRatio || 1);
+  return (set.find((v) => v.w >= need) || set[set.length - 1]).u;
+}
+
+/** Inline background images rewritten server-side to data-bg-srcset (src/lib/images.ts). */
+function initResponsiveBackgrounds(root: ParentNode) {
+  const els = Array.from(root.querySelectorAll<HTMLElement>('[data-bg-srcset]'));
+  if (!els.length) return;
+  const load = (el: HTMLElement) => {
+    const url = pickFromSrcset(el.dataset.bgSrcset, el);
+    if (url) el.style.backgroundImage = `url("${url}")`;
+  };
+  if (!('IntersectionObserver' in window)) return els.forEach(load);
+  const io = new IntersectionObserver(
+    (entries) => entries.forEach((e) => e.isIntersecting && (io.unobserve(e.target), load(e.target as HTMLElement))),
+    { rootMargin: '300px 0px' },
+  );
+  els.forEach((el) => io.observe(el));
+}
+
 function initCarousels(root: ParentNode) {
   root.querySelectorAll<HTMLElement>('.elementor-widget-image-carousel').forEach((widget) => {
     const s = settingsOf(widget);
@@ -244,10 +273,21 @@ function initGalleries(root: ParentNode) {
     };
     apply();
     window.addEventListener('resize', apply);
-    c.querySelectorAll<HTMLElement>('.e-gallery-image[data-thumbnail]').forEach((img) => {
-      img.style.backgroundImage = `url("${img.dataset.thumbnail}")`;
+    // tiles load when near the viewport, from the smallest WebP variant that covers tile width × DPR
+    const load = (img: HTMLElement) => {
+      const url = pickFromSrcset(img.dataset.srcset, img) || img.dataset.thumbnail!;
+      img.style.backgroundImage = `url("${url}")`;
       img.classList.add('e-gallery-image-loaded');
-    });
+    };
+    const tiles = Array.from(c.querySelectorAll<HTMLElement>('.e-gallery-image[data-thumbnail]'));
+    if (!('IntersectionObserver' in window)) tiles.forEach(load);
+    else {
+      const io = new IntersectionObserver(
+        (entries) => entries.forEach((e) => e.isIntersecting && (io.unobserve(e.target), load(e.target as HTMLElement))),
+        { rootMargin: '300px 0px' },
+      );
+      tiles.forEach((t) => io.observe(t));
+    }
   });
 }
 
@@ -373,7 +413,7 @@ export function WpRuntime() {
     if (!root || root.dataset.fdInit) return;
     root.dataset.fdInit = '1';
     document.documentElement.classList.remove('no-js');
-    const steps = [initSticky, initNavMenus, initAnimations, initLazyBackgrounds, initCarousels, initGalleries, initPostsImageFit, initLightbox];
+    const steps = [initSticky, initNavMenus, initAnimations, initLazyBackgrounds, initResponsiveBackgrounds, initCarousels, initGalleries, initPostsImageFit, initLightbox];
     for (const f of steps) {
       try {
         f(root);

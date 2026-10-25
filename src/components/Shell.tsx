@@ -3,6 +3,7 @@ import { getMenu, getSettings, getTemplate, type HeadEntry } from '@/lib/content
 import { applyBranding, deferScripts, fillHeader } from '@/lib/render';
 import { HeadStyles } from './HeadStyles';
 import { WpRuntime } from './WpRuntime';
+import { responsiveHtml } from '@/lib/images';
 
 type Chaty = {
   enabled: boolean;
@@ -47,6 +48,11 @@ export async function Shell({
   children: ReactNode;
 }) {
   const [header, footer, menu, settings] = await Promise.all([getTemplate('header'), getTemplate('footer'), getMenu('primary'), getSettings()]);
+  // header images (logo) are first-screen: keep them eager; footer images lazy
+  const [headerHtml, footerHtml] = await Promise.all([
+    responsiveHtml(deferScripts(applyBranding(fillHeader(header?.content_html || '', menu, path), settings)), { eager: 99 }),
+    responsiveHtml(deferScripts(applyBranding(footer?.content_html || '', settings))),
+  ]);
   return (
     <div
       id="wp-body"
@@ -61,9 +67,9 @@ export async function Shell({
         跳至主要內容
       </a>
       <div id="main-container">
-        <div className="fd-contents" dangerouslySetInnerHTML={{ __html: deferScripts(applyBranding(fillHeader(header?.content_html || '', menu, path), settings)) }} />
+        <div className="fd-contents" dangerouslySetInnerHTML={{ __html: headerHtml }} />
         {children}
-        <div className="fd-contents" dangerouslySetInnerHTML={{ __html: deferScripts(applyBranding(footer?.content_html || '', settings)) }} />
+        <div className="fd-contents" dangerouslySetInnerHTML={{ __html: footerHtml }} />
       </div>
       <ChatyButton chaty={settings.chaty} />
       <WpRuntime />

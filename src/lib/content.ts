@@ -55,7 +55,7 @@ export type Term = {
   seo: Seo | null;
 };
 
-export type Media = { id: number; url: string | null; width: number | null; height: number | null; alt_text: string; title: string };
+export type Media = { id: number; url: string | null; width: number | null; height: number | null; alt_text: string; title: string; variants?: { w: number; h: number; url: string }[] };
 export type Author = { id: number; slug: string; display_name: string; description: string | null };
 export type MenuItem = { id: number; parent_id: number | null; position: number; title: string; url: string; object_type: string | null; object_id: number | null; target: string | null; classes: string[] };
 
@@ -156,7 +156,7 @@ async function postTermsFor(ids: number[]): Promise<Map<number, Term[]>> {
 export async function getMedia(ids: number[]): Promise<Map<number, Media>> {
   const uniq = [...new Set(ids.filter(Boolean))];
   if (!uniq.length) return new Map();
-  const { data, error } = await db().from('media').select('id,url,width,height,alt_text,title').in('id', uniq);
+  const { data, error } = await db().from('media').select('id,url,width,height,alt_text,title,variants').in('id', uniq);
   if (error) throw error;
   return new Map((data ?? []).map((m) => [m.id, m as Media]));
 }

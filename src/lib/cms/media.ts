@@ -79,6 +79,37 @@ function baseName(filename: string) {
   return ascii || `file-${Date.now().toString(36)}`;
 }
 
+/** Responsive WebP variants (same as scripts/migrate/build_variants.mjs): 480/960/1440 wide, quality 75, never upscaled. */
+const VARIANT_WIDTHS = [480, 960, 1440];
+const VARIANT_CACHE = 'public, max-age=31536000, immutable';
+type StoredVariant = { w: number; h: number; path: string; url: string; bytes: number };
+
+async function makeVariants(original: Buffer, storagePath: string, animated = false): Promise<StoredVariant[]> {
+  const open = () => (animated ? sharp(original, { failOn: 'none', animated: true }) : sharp(original, { failOn: 'none' }).rotate());
+  const meta = await open().metadata();
+  const ow = (meta.orientation ?? 1) >= 5 ? meta.height : meta.width;
+  const oh = animated ? meta.pageHeight || meta.height : (meta.orientation ?? 1) >= 5 ? meta.width : meta.height;
+  const stem = storagePath.replace(/\.[^./]+$/, '');
+  const out: StoredVariant[] = [];
+  for (const w of VARIANT_WIDTHS) {
+    if (!ow || ow <= w) continue;
+    const { data, info } = await open().resize({ width: w, withoutEnlargement: true }).webp({ quality: 75 }).toBuffer({ resolveWithObject: true });
+    const key = `v/${w}/${stem}.webp`;
+    // storage-js only sends "max-age=<n>"; the REST API keeps a full cache-control header as given
+    const url = `${process.env.SUPABASE_URL}/storage/v1/object/${BUCKET}/${key.split('/').map(encodeURIComponent).join('/')}`;
+    const key2 = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const res = await fetch(url, {
+      method: 'POST',
+      body: new Uint8Array(data),
+      headers: { apikey: key2, Authorization: `Bearer ${key2}`, 'Content-Type': 'image/webp', 'x-upsert': 'true', 'cache-control': VARIANT_CACHE },
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new CmsError(`storage variant: ${res.status} ${(await res.text()).slice(0, 200)}`, 500);
+    out.push({ w: info.width, h: oh && ow ? Math.round((info.width * oh) / ow) : info.height, path: key, url: publicUrl(key), bytes: data.length });
+  }
+  return out;
+}
+
 async function uniquePath(dir: string, stem: string, ext: string) {
   for (let i = 0; i < 100; i++) {
     const p = `${dir}/${i ? `${stem}-${i}` : stem}.${ext}`;
@@ -133,7 +164,8 @@ export async function uploadMedia(
   const path = await uniquePath(monthDir(), stem, ext);
   const up = await adminDb().storage.from(BUCKET).upload(path, body, { contentType: storedMime, upsert: false, cacheControl: '31536000' });
   if (up.error) throw new CmsError(`storage: ${up.error.message}`, 500);
-  return insertRow({ path, storedMime, originalMime: mime, bytes: body.length, originalBytes: input.buffer.length, sha1, width, height, ow, oh, filename: input.filename, title: input.title, alt: input.alt_text, parent: input.parent_post_id }, actor);
+  const variants = CONVERT.includes(mime) ? await makeVariants(input.buffer, path) : mime === 'image/gif' ? await makeVariants(input.buffer, path, true) : [];
+  return insertRow({ variants, path, storedMime, originalMime: mime, bytes: body.length, originalBytes: input.buffer.length, sha1, width, height, ow, oh, filename: input.filename, title: input.title, alt: input.alt_text, parent: input.parent_post_id }, actor);
 }
 
 async function insertRow(
@@ -152,6 +184,7 @@ async function insertRow(
     title?: string;
     alt?: string;
     parent?: number | null;
+    variants?: StoredVariant[];
   },
   actor: Actor,
 ) {
@@ -178,6 +211,7 @@ async function insertRow(
     sha1: f.sha1,
     parent_post_id: f.parent ?? null,
     status: 'inherit',
+    variants: f.variants ?? [],
     date: nowIso(),
     modified: nowIso(),
     meta: { uploaded_via: actor.label === 'mcp' ? 'mcp' : 'admin', original_filename: f.filename, original_width: f.ow, original_height: f.oh },
@@ -242,7 +276,8 @@ export async function deleteMedia(id: number, actor: Actor) {
   if (before.storage_path) {
     const others = must(await adminDb().from('media').select('id').eq('storage_path', before.storage_path).neq('id', id).limit(1), 'media');
     if (!others?.length) {
-      const rm = await adminDb().storage.from(BUCKET).remove([before.storage_path]);
+      const variantPaths = (Array.isArray(before.variants) ? before.variants : []).map((v: any) => v?.path).filter(Boolean);
+      const rm = await adminDb().storage.from(BUCKET).remove([before.storage_path, ...variantPaths]);
       if (rm.error) throw new CmsError(`storage: ${rm.error.message}`, 500);
     }
   }

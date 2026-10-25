@@ -1,8 +1,16 @@
 import { Fragment, type ReactNode } from 'react';
 import type { Card, Post } from '@/lib/content';
 import { deferScripts, wpDate, wpDateIso } from '@/lib/render';
+import { responsiveHtml, sizesFor, srcsetOf } from '@/lib/images';
+import type { Media } from '@/lib/content';
 
 const html = (s: string) => ({ __html: s });
+
+/** srcset/sizes props for a featured image (variants recorded in media.variants). */
+function respProps(m: Media, displayWidth: number) {
+  const set = m.url ? srcsetOf({ url: m.url, width: m.width, height: m.height, variants: m.variants ?? [] }) : null;
+  return set ? { srcSet: set, sizes: sizesFor(displayWidth, true) } : {};
+}
 
 function CardMeta1({ card }: { card: Card }) {
   const cats = card.terms.filter((t) => t.taxonomy === 'category');
@@ -53,6 +61,7 @@ export function EntryCard({ card }: { card: Card }) {
             width={card.media.width ?? undefined}
             height={card.media.height ?? undefined}
             src={card.media.url}
+            {...respProps(card.media, 768)}
             className="attachment-medium_large size-medium_large wp-post-image"
             alt={card.media.alt_text || ''}
             decoding="async"
@@ -159,7 +168,8 @@ export function Archive({ title, description, cards, pagination }: { title: Reac
   );
 }
 
-export function SinglePost({ post, related, catIds }: { post: Post; related: Card[]; catIds: number[] }) {
+export async function SinglePost({ post, related, catIds }: { post: Post; related: Card[]; catIds: number[] }) {
+  const body = await responsiveHtml(deferScripts(post.content_html), { eager: 1 });
   const cls = [`post-${post.id}`, 'post', 'type-post', 'status-publish', 'format-standard', post.featured_media_id ? 'has-post-thumbnail' : '', 'hentry', ...catIds.map((i) => `category-${i}`)]
     .filter(Boolean)
     .join(' ');
@@ -175,7 +185,7 @@ export function SinglePost({ post, related, catIds }: { post: Post; related: Car
               {post.excerpt_html ? <div className="page-description ct-hidden-sm" dangerouslySetInnerHTML={html(post.excerpt_html)} /> : null}
             </header>
           </div>
-          <div className="entry-content is-layout-constrained" dangerouslySetInnerHTML={html(deferScripts(post.content_html))} />
+          <div className="entry-content is-layout-constrained" dangerouslySetInnerHTML={html(body)} />
         </article>
       </div>
       {related.length ? (
@@ -194,6 +204,7 @@ export function SinglePost({ post, related, catIds }: { post: Post; related: Car
                             width={r.media.width ?? undefined}
                             height={r.media.height ?? undefined}
                             src={r.media.url}
+                            {...respProps(r.media, 768)}
                             className="attachment-medium_large size-medium_large wp-post-image"
                             alt={r.media.alt_text || ''}
                             decoding="async"
@@ -219,6 +230,7 @@ export function SinglePost({ post, related, catIds }: { post: Post; related: Car
   );
 }
 
-export function ElementorPage({ post }: { post: Post }) {
-  return <main id="main" className="site-main hfeed" dangerouslySetInnerHTML={html(deferScripts(post.content_html))} />;
+export async function ElementorPage({ post }: { post: Post }) {
+  const body = await responsiveHtml(deferScripts(post.content_html), { eager: 1 });
+  return <main id="main" className="site-main hfeed" dangerouslySetInnerHTML={html(body)} />;
 }
