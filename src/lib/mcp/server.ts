@@ -362,7 +362,7 @@ export function buildServer() {
     'list_orders',
     {
       title: '查詢訂單',
-      description: '舊站訂單待資料庫備份匯入後才會有資料。',
+      description: '訂單（舊站資料庫備份已匯入；四拾九天不是商店，舊站沒有訂單）。回傳 items 與 total。',
       inputSchema: {
         status: z.enum(['pending', 'processing', 'on-hold', 'completed', 'cancelled', 'refunded', 'failed']).optional(),
         search: z.string().optional().describe('訂單編號'),
@@ -391,6 +391,30 @@ export function buildServer() {
       annotations: WR,
     },
     h(async (a: { id: number; status: string; note?: string }) => site.updateOrderStatus(a.id, a.status, a.note, ACTOR)),
+  );
+
+  server.registerTool(
+    'list_customers',
+    {
+      title: '查詢顧客',
+      inputSchema: { search: z.string().optional().describe('姓名或 Email'), limit: z.number().int().min(1).max(200).default(30), offset: z.number().int().min(0).default(0) },
+      annotations: RO,
+    },
+    h(async (a: { search?: string; limit: number; offset: number }) => site.listCustomers({ q: a.search, limit: a.limit, offset: a.offset })),
+  );
+  server.registerTool(
+    'get_customer',
+    { title: '讀取顧客（含訂單）', inputSchema: { id: z.number().int() }, annotations: RO },
+    h(async (a: { id: number }) => {
+      const c = await site.getCustomer(a.id);
+      if (!c) throw new CmsError('找不到顧客', 404);
+      return c;
+    }),
+  );
+  server.registerTool(
+    'list_coupons',
+    { title: '查詢優惠券', inputSchema: { limit: z.number().int().min(1).max(200).default(50), offset: z.number().int().min(0).default(0) }, annotations: RO },
+    h(async (a: { limit: number; offset: number }) => site.listCoupons({ limit: a.limit, offset: a.offset })),
   );
 
   /* ------------------------------------------------------------- settings */

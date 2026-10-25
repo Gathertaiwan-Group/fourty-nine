@@ -47,7 +47,7 @@ export async function Shell({
   itemType?: string;
   children: ReactNode;
 }) {
-  const [header, footer, menu, settings] = await Promise.all([getTemplate('header'), getTemplate('footer'), getMenu('primary'), getSettings()]);
+  const [header, footer, menu, settings] = await Promise.all([getTemplate('header'), getTemplate('footer'), getMenu('header'), getSettings()]);
   // header images (logo) are first-screen: keep them eager; footer images lazy
   const [headerHtml, footerHtml] = await Promise.all([
     responsiveHtml(deferScripts(applyBranding(fillHeader(header?.content_html || '', menu, path), settings)), { eager: 99 }),

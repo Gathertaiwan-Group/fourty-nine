@@ -93,9 +93,16 @@ export const getTemplate = cache(async (slug: string): Promise<{ content_html: s
   return data;
 });
 
-export const getMenu = cache(async (slug: string): Promise<MenuItem[]> => {
-  const { data: menu, error } = await db().from('menus').select('id').eq('slug', slug).maybeSingle();
-  if (error) throw error;
+/** Menu items for a theme location (e.g. 'header'); falls back to a menu slug. Menus are the real WP nav_menu terms. */
+export const getMenu = cache(async (location: string): Promise<MenuItem[]> => {
+  const byLoc = await db().from('menus').select('id').eq('location', location).order('id').limit(1).maybeSingle();
+  if (byLoc.error) throw byLoc.error;
+  let menu = byLoc.data;
+  if (!menu) {
+    const bySlug = await db().from('menus').select('id').eq('slug', location).maybeSingle();
+    if (bySlug.error) throw bySlug.error;
+    menu = bySlug.data;
+  }
   if (!menu) return [];
   const { data, error: e2 } = await db()
     .from('menu_items')

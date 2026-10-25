@@ -139,27 +139,46 @@ export async function saveMenu(id: number, items: MenuItemInput[], actor: Actor,
 
 export async function listForms() {
   const forms = must(await adminDb().from('forms').select('id,slug,name,fields,is_active,created_at').order('id'), 'forms') ?? [];
-  const counts = must(await adminDb().from('form_submissions').select('form_id,status'), 'form_submissions') ?? [];
-  return forms.map((f) => ({
-    ...f,
-    total: counts.filter((c) => c.form_id === f.id).length,
-    unread: counts.filter((c) => c.form_id === f.id && c.status === 'new').length,
-  }));
+  const count = async (id: number, status?: string) => {
+    let q = adminDb().from('form_submissions').select('id', { count: 'exact', head: true }).eq('form_id', id);
+    if (status) q = q.eq('status', status);
+    const res = await q;
+    must(res, 'form_submissions');
+    return res.count ?? 0;
+  };
+  return Promise.all(forms.map(async (f) => ({ ...f, total: await count(f.id), unread: await count(f.id, 'new') })));
+}
+
+/** field id -> label, from the form definition (imported Elementor forms store values by field id). */
+export function fieldLabels(fields: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const f of Array.isArray(fields) ? (fields as { id?: string; label?: string }[]) : []) if (f?.id) out[f.id] = f.label || f.id;
+  return out;
 }
 
 export async function listSubmissions(opts: { form_id?: number; status?: string; limit?: number; offset?: number; q?: string }) {
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 1000);
   const offset = Math.max(opts.offset ?? 0, 0);
-  let q = adminDb().from('form_submissions').select('id,form_id,wp_id,data,page_path,ip,user_agent,status,created_at,forms(name,slug)', { count: 'exact' });
-  if (opts.form_id) q = q.eq('form_id', opts.form_id);
-  if (opts.status) q = q.eq('status', opts.status);
-  const res = await q.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
-  let items = (must(res, 'form_submissions') ?? []) as any[];
-  if (opts.q) {
-    const needle = opts.q.toLowerCase();
-    items = items.filter((i) => JSON.stringify(i.data).toLowerCase().includes(needle));
+  const base = () => {
+    let q = adminDb().from('form_submissions').select('id,form_id,wp_id,data,page_path,ip,user_agent,status,created_at,forms(name,slug,fields)', { count: 'exact' });
+    if (opts.form_id) q = q.eq('form_id', opts.form_id);
+    if (opts.status) q = q.eq('status', opts.status);
+    return q.order('created_at', { ascending: false });
+  };
+  if (!opts.q) {
+    const res = await base().range(offset, offset + limit - 1);
+    return { items: (must(res, 'form_submissions') ?? []) as any[], total: res.count ?? 0 };
   }
-  return { items, total: res.count ?? 0 };
+  // free-text search over the submitted values: scan every matching row (page by 1000), then paginate
+  const needle = opts.q.toLowerCase();
+  const all: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const res = await base().range(from, from + 999);
+    const rows = (must(res, 'form_submissions') ?? []) as any[];
+    all.push(...rows.filter((i) => JSON.stringify(i.data).toLowerCase().includes(needle)));
+    if (rows.length < 1000) break;
+  }
+  return { items: all.slice(offset, offset + limit), total: all.length };
 }
 
 export const SUBMISSION_STATUSES = ['new', 'read', 'replied', 'spam', 'trash'] as const;
@@ -190,10 +209,19 @@ function csvCell(v: unknown) {
 }
 
 export async function submissionsCsv(formId?: number) {
-  const { items } = await listSubmissions({ form_id: formId, limit: 1000 });
+  const items: any[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const page = await listSubmissions({ form_id: formId, limit: 1000, offset });
+    items.push(...page.items);
+    if (page.items.length < 1000) break;
+  }
   const fieldKeys: string[] = [];
-  for (const i of items) for (const k of Object.keys(i.data || {})) if (!fieldKeys.includes(k)) fieldKeys.push(k);
-  const head = ['id', 'form', 'created_at', 'status', 'page_path', ...fieldKeys, 'ip', 'user_agent'];
+  const labels: Record<string, string> = {};
+  for (const i of items) {
+    Object.assign(labels, fieldLabels(i.forms?.fields));
+    for (const k of Object.keys(i.data || {})) if (!fieldKeys.includes(k)) fieldKeys.push(k);
+  }
+  const head = ['id', 'form', 'created_at', 'status', 'page_path', ...fieldKeys.map((k) => labels[k] ?? k), 'ip', 'user_agent'];
   const lines = [head.map(csvCell).join(',')];
   for (const i of items) {
     lines.push(
@@ -262,6 +290,15 @@ export async function deleteRedirect(id: number, actor: Actor) {
 /* ------------------------------------------------------------------ orders (filled from the DB backup in phase 3) */
 
 export const ORDER_STATUSES = ['pending', 'processing', 'on-hold', 'completed', 'cancelled', 'refunded', 'failed'] as const;
+export const ORDER_STATUS_LABEL: Record<string, string> = {
+  pending: '待付款',
+  processing: '處理中',
+  'on-hold': '保留',
+  completed: '已完成',
+  cancelled: '已取消',
+  refunded: '已退款',
+  failed: '失敗',
+};
 
 export async function listOrders(opts: { status?: string; q?: string; limit?: number; offset?: number }) {
   const limit = Math.min(Math.max(opts.limit ?? 20, 1), 200);
@@ -303,6 +340,55 @@ export async function updateOrderStatus(id: number, status: string, note: string
     });
   await audit(actor, 'update', 'orders', id, before, after);
   return after;
+}
+
+export async function orderStatusCounts() {
+  const out: Record<string, number> = {};
+  await Promise.all(
+    ORDER_STATUSES.map(async (st) => {
+      const r = await adminDb().from('orders').select('id', { count: 'exact', head: true }).eq('status', st);
+      must(r, 'orders');
+      out[st] = r.count ?? 0;
+    }),
+  );
+  return out;
+}
+
+/* ------------------------------------------------------------------ customers / coupons (WooCommerce, from the DB backup) */
+
+export async function listCustomers(opts: { q?: string; limit?: number; offset?: number }) {
+  const limit = Math.min(Math.max(opts.limit ?? 30, 1), 200);
+  const offset = Math.max(opts.offset ?? 0, 0);
+  let q = adminDb()
+    .from('customers')
+    .select('id,email,username,first_name,last_name,display_name,billing,is_paying,date_created', { count: 'exact' });
+  if (opts.q) {
+    const s = opts.q.replace(/[%,()*]/g, ' ').trim();
+    if (s) q = q.or(`email.ilike.*${s}*,first_name.ilike.*${s}*,last_name.ilike.*${s}*,display_name.ilike.*${s}*`);
+  }
+  const res = await q.order('id', { ascending: false }).range(offset, offset + limit - 1);
+  return { items: must(res, 'customers') ?? [], total: res.count ?? 0 };
+}
+
+export async function getCustomer(id: number) {
+  const c = must(await adminDb().from('customers').select('*').eq('id', id).maybeSingle(), 'customers');
+  if (!c) return null;
+  const orders = must(
+    await adminDb().from('orders').select('id,order_number,status,total,currency,date_created').eq('customer_id', id).order('date_created', { ascending: false }),
+    'orders',
+  );
+  return { ...c, orders };
+}
+
+export async function listCoupons(opts: { limit?: number; offset?: number }) {
+  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+  const offset = Math.max(opts.offset ?? 0, 0);
+  const res = await adminDb()
+    .from('coupons')
+    .select('id,code,discount_type,amount,description,date_expires,usage_count,usage_limit,free_shipping,minimum_amount,status', { count: 'exact' })
+    .order('id', { ascending: false })
+    .range(offset, offset + limit - 1);
+  return { items: must(res, 'coupons') ?? [], total: res.count ?? 0 };
 }
 
 /* ------------------------------------------------------------------ audit log */

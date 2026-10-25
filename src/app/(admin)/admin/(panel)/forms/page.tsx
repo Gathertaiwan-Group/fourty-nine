@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { listForms, listSubmissions, SUBMISSION_STATUSES } from '@/lib/cms/site';
+import { fieldLabels, listForms, listSubmissions, SUBMISSION_STATUSES } from '@/lib/cms/site';
 import { ConfirmSubmit } from '../../components/ConfirmSubmit';
 import { deleteSubmission, setSubmissionStatus } from '../actions';
 
@@ -51,7 +51,7 @@ export default async function FormsPage({ searchParams }: { searchParams: Promis
         <button className="btn">篩選</button>
       </form>
       {!forms.length ? (
-        <div className="notice">舊網站沒有任何 Elementor 表單或提交紀錄；新表單送出的資料（/api/forms/&lt;slug&gt;/）會出現在這裡。</div>
+        <div className="notice">尚無表單。新表單送出的資料（/api/forms/&lt;slug&gt;/）會出現在這裡。</div>
       ) : null}
       <table className="table">
         <thead>
@@ -79,7 +79,7 @@ export default async function FormsPage({ searchParams }: { searchParams: Promis
                   <dl className="mt-2 grid grid-cols-[120px_1fr] gap-1 text-xs">
                     {Object.entries(s.data || {}).map(([k, v]) => (
                       <div key={k} className="contents">
-                        <dt className="text-gray-500">{k}</dt>
+                        <dt className="text-gray-500">{fieldLabels(s.forms?.fields)[k] ?? k}</dt>
                         <dd className="whitespace-pre-wrap">{String(v)}</dd>
                       </div>
                     ))}

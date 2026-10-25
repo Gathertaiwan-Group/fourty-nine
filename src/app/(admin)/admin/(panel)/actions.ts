@@ -174,3 +174,9 @@ export async function deleteSubmission(form: FormData) {
   await run((a) => site.deleteSubmission(String(form.get('id')), a));
   revalidatePath('/admin/forms/');
 }
+
+export async function setOrderStatus(form: FormData) {
+  const id = Number(form.get('id'));
+  await run((a) => site.updateOrderStatus(id, String(form.get('status')), String(form.get('note') || '') || undefined, a));
+  revalidatePath('/admin/orders/');
+}
