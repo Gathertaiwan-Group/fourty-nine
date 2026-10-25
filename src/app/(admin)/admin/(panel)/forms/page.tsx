@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import Link from 'next/link';
 import { fieldLabels, listForms, listSubmissions, SUBMISSION_STATUSES } from '@/lib/cms/site';
 import { ConfirmSubmit } from '../../components/ConfirmSubmit';
@@ -9,6 +10,7 @@ const LABEL: Record<string, string> = { new: '未讀', read: '已讀', replied: 
 const fmt = (d: string) => new Date(d).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
 
 export default async function FormsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  await requireAdmin();
   const sp = await searchParams;
   const formId = Number(sp.form) || undefined;
   const page = Math.max(1, Number(sp.p || 1));

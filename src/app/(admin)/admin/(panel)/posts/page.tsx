@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import Link from 'next/link';
 import { listAuthors, listPosts, STATUS_LABEL, statusCounts } from '@/lib/cms/posts';
 import { deletePostForever, restorePost, trashPost } from '../actions';
@@ -8,6 +9,7 @@ const PER = 20;
 const fmt = (d: string | null) => (d ? new Date(d).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '—');
 
 export default async function PostsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  await requireAdmin();
   const sp = await searchParams;
   const type = sp.type === 'page' ? 'page' : 'post';
   const status = sp.status || 'all';

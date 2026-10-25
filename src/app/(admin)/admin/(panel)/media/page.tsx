@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import Link from 'next/link';
 import { getMediaItem, listMedia } from '@/lib/cms/media';
 import { ActionForm } from '../../components/ActionForm';
@@ -10,6 +11,7 @@ const PER = 60;
 const kb = (n: number | null) => (n == null ? '—' : n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`);
 
 export default async function MediaPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  await requireAdmin();
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.p || 1));
   const type = sp.type === 'image' || sp.type === 'file' ? sp.type : '';

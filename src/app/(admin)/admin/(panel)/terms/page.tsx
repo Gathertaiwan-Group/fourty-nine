@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import Link from 'next/link';
 import { listTerms } from '@/lib/cms/terms';
 import { ActionForm } from '../../components/ActionForm';
@@ -7,6 +8,7 @@ import { deleteTerm, saveTerm } from '../actions';
 export const metadata = { title: '分類與標籤' };
 
 export default async function TermsPage({ searchParams }: { searchParams: Promise<{ tax?: string; edit?: string }> }) {
+  await requireAdmin();
   const sp = await searchParams;
   const tax = sp.tax === 'post_tag' ? 'post_tag' : 'category';
   const all = await listTerms(tax);

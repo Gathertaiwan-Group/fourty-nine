@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import Link from 'next/link';
 import { adminDb } from '@/lib/db';
 import { getMenuWithItems, listMenus } from '@/lib/cms/site';
@@ -6,6 +7,7 @@ import { MenuEditor } from '../../components/MenuEditor';
 export const metadata = { title: '選單' };
 
 export default async function MenusPage({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
+  await requireAdmin();
   const menus = await listMenus();
   const id = Number((await searchParams).id) || menus[0]?.id;
   const menu = id ? await getMenuWithItems(id) : null;

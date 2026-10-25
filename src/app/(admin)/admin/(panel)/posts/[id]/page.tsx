@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import { notFound } from 'next/navigation';
 import { getPost } from '@/lib/cms/posts';
 import { getMediaItem } from '@/lib/cms/media';
@@ -7,6 +8,7 @@ import { editorContext } from '../editorData';
 export const metadata = { title: '編輯' };
 
 export default async function EditPost({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin();
   const id = Number((await params).id);
   if (!Number.isFinite(id)) notFound();
   const post = await getPost(id);

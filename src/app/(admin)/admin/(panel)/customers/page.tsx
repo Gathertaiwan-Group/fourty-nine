@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import Link from 'next/link';
 import { getCustomer, listCustomers } from '@/lib/cms/site';
 
@@ -6,6 +7,7 @@ const PER = 30;
 const fmt = (d: string | null) => (d ? new Date(d).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '—');
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  await requireAdmin();
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.p || 1));
   const [{ items, total }, one] = await Promise.all([

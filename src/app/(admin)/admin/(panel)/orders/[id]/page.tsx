@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getOrder, ORDER_STATUS_LABEL, ORDER_STATUSES } from '@/lib/cms/site';
@@ -20,6 +21,7 @@ function Address({ a }: { a: Record<string, string> | null }) {
 }
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin();
   const { id } = await params;
   const o: any = await getOrder(Number(id));
   if (!o) notFound();

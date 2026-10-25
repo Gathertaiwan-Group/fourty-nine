@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import Link from 'next/link';
 import { dashboardCounts, listAudit } from '@/lib/cms/site';
 import { listPosts } from '@/lib/cms/posts';
@@ -7,6 +8,7 @@ export const metadata = { title: '控制台' };
 const fmt = (d: string | null) => (d ? new Date(d).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '—');
 
 export default async function Dashboard() {
+  await requireAdmin();
   const [c, recent, drafts] = await Promise.all([dashboardCounts(), listAudit({ limit: 10 }), listPosts({ post_type: 'post', status: 'draft', limit: 5 })]);
   const stats = [
     { label: '已發布文章', value: c.posts, href: '/admin/posts/?type=post&status=publish' },

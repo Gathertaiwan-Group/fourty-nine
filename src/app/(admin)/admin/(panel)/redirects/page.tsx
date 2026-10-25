@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import Link from 'next/link';
 import { listRedirects } from '@/lib/cms/site';
 import { ActionForm } from '../../components/ActionForm';
@@ -9,6 +10,7 @@ const PER = 50;
 const KIND: Record<string, string> = { attachment: '附件頁', manual: '手動', legacy: '舊網址' };
 
 export default async function RedirectsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  await requireAdmin();
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.p || 1));
   const { items, total } = await listRedirects({ q: sp.q, kind: sp.kind, limit: PER, offset: (page - 1) * PER });

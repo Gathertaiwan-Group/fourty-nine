@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import { getAllSettings } from '@/lib/cms/site';
 import { ActionForm } from '../../components/ActionForm';
 import { ImageField } from '../../components/ImageField';
@@ -6,6 +7,7 @@ import { saveSettings } from '../actions';
 export const metadata = { title: '網站設定' };
 
 export default async function SettingsPage() {
+  await requireAdmin();
   const s = await getAllSettings();
   const c = (s.contact ?? {}) as Record<string, string>;
   const t = (s.tracking_ids ?? {}) as Record<string, string>;

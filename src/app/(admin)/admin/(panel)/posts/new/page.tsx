@@ -1,9 +1,11 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import { PostEditor } from '../../../components/PostEditor';
 import { editorContext } from '../editorData';
 
 export const metadata = { title: '新增' };
 
 export default async function NewPost({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
+  await requireAdmin();
   const type = (await searchParams).type === 'page' ? 'page' : 'post';
   const ctx = await editorContext();
   const defaultAuthor = ctx.authors[0]?.id ?? null;

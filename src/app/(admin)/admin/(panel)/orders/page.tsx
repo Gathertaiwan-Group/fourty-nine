@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import Link from 'next/link';
 import { listOrders, orderStatusCounts, ORDER_STATUS_LABEL, ORDER_STATUSES } from '@/lib/cms/site';
 
@@ -7,6 +8,7 @@ const fmt = (d: string | null) => (d ? new Date(d).toLocaleString('zh-TW', { tim
 const money = (n: number | string, cur: string) => `${cur} ${Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  await requireAdmin();
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.p || 1));
   const [{ items, total }, counts] = await Promise.all([

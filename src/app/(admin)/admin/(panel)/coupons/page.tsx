@@ -1,9 +1,11 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import { listCoupons } from '@/lib/cms/site';
 
 export const metadata = { title: '優惠券' };
 const TYPE: Record<string, string> = { percent: '百分比折扣', fixed_cart: '購物車固定折扣', fixed_product: '商品固定折扣' };
 
 export default async function CouponsPage() {
+  await requireAdmin();
   const { items, total } = await listCoupons({ limit: 200 });
   return (
     <div className="space-y-4">

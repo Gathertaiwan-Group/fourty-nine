@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/admin/auth';
 import Link from 'next/link';
 import { listAudit } from '@/lib/cms/site';
 
@@ -7,6 +8,7 @@ const fmt = (d: string) => new Date(d).toLocaleString('zh-TW', { timeZone: 'Asia
 const ENTITIES = ['posts', 'terms', 'media', 'menus', 'settings', 'redirects', 'form_submissions', 'orders', 'admins'];
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  await requireAdmin();
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.p || 1));
   const { items, total } = await listAudit({ entity: sp.entity, actor: sp.actor, entity_id: sp.entity_id, limit: PER, offset: (page - 1) * PER });
